@@ -539,6 +539,39 @@
       word-break: break-word;
     }
 
+    .ai-status {
+      min-height: 19px;
+      margin-top: 10px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.6;
+    }
+
+    .ai-status.error {
+      color: var(--danger);
+    }
+
+    .ai-status.ok {
+      color: #2d7a46;
+    }
+
+    .key-row {
+      display: grid;
+      grid-template-columns: 1fr auto auto;
+      gap: 8px;
+    }
+
+    .result-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-top: 10px;
+    }
+
+    .result-grid textarea {
+      min-height: 120px;
+    }
+
     .export-result {
       display: none;
       width: min(100%, 720px);
@@ -584,6 +617,11 @@
       }
 
       .grid {
+        grid-template-columns: 1fr;
+      }
+
+      .key-row,
+      .result-grid {
         grid-template-columns: 1fr;
       }
 
@@ -639,6 +677,55 @@
             <div class="field">
               <label for="defaultTime">默认时间</label>
               <input id="defaultTime" value="5/26 18:03" placeholder="5/26 18:03">
+            </div>
+          </div>
+        </section>
+
+        <section class="section">
+          <div class="section-title">
+            <h2>图片识别翻译</h2>
+          </div>
+
+          <div class="grid">
+            <div class="field full">
+              <label for="openaiKey">OpenAI API Key（本机保存）</label>
+              <div class="key-row">
+                <input id="openaiKey" type="password" autocomplete="off" placeholder="sk-...">
+                <button class="btn secondary" id="saveKeyBtn" type="button">保存</button>
+                <button class="btn danger" id="forgetKeyBtn" type="button">删除</button>
+              </div>
+            </div>
+            <div class="field">
+              <label for="ocrModel">模型</label>
+              <input id="ocrModel" value="gpt-5-mini">
+            </div>
+            <div class="field">
+              <label for="ocrImage">截图/图片</label>
+              <input id="ocrImage" type="file" accept="image/*">
+            </div>
+            <div class="field full">
+              <label for="ocrPrompt">识别要求</label>
+              <textarea id="ocrPrompt">只识别消息气泡里的正文，忽略头像、昵称、时间、菜单和界面文字。保留原文换行，并翻译成自然简体中文。</textarea>
+            </div>
+          </div>
+
+          <div class="actions" style="margin-top: 12px;">
+            <button class="btn" id="runOcrBtn" type="button">识别并翻译</button>
+            <button class="btn secondary" id="useOriginalBtn" type="button">填入原文</button>
+            <button class="btn secondary" id="useTranslationBtn" type="button">填入译文</button>
+            <button class="btn secondary" id="useBothBtn" type="button">原文 + 译文</button>
+          </div>
+
+          <div class="ai-status" id="ocrStatus">API Key 只保存在当前浏览器。</div>
+
+          <div class="result-grid">
+            <div class="field">
+              <label for="ocrOriginal">原文</label>
+              <textarea id="ocrOriginal" placeholder="识别出的原文会在这里"></textarea>
+            </div>
+            <div class="field">
+              <label for="ocrTranslation">中文翻译</label>
+              <textarea id="ocrTranslation" placeholder="翻译结果会在这里"></textarea>
             </div>
           </div>
         </section>
@@ -717,6 +804,8 @@
       selectedType: "text",
       editingId: null,
       mediaDraft: null,
+      ocrImageDataUrl: "",
+      ocrImageName: "",
       messages: [
         {
           id: crypto.randomUUID(),
@@ -732,6 +821,19 @@
       defaultTime: document.querySelector("#defaultTime"),
       avatarInput: document.querySelector("#avatarInput"),
       avatarPreview: document.querySelector("#avatarPreview"),
+      openaiKey: document.querySelector("#openaiKey"),
+      saveKeyBtn: document.querySelector("#saveKeyBtn"),
+      forgetKeyBtn: document.querySelector("#forgetKeyBtn"),
+      ocrModel: document.querySelector("#ocrModel"),
+      ocrImage: document.querySelector("#ocrImage"),
+      ocrPrompt: document.querySelector("#ocrPrompt"),
+      runOcrBtn: document.querySelector("#runOcrBtn"),
+      useOriginalBtn: document.querySelector("#useOriginalBtn"),
+      useTranslationBtn: document.querySelector("#useTranslationBtn"),
+      useBothBtn: document.querySelector("#useBothBtn"),
+      ocrOriginal: document.querySelector("#ocrOriginal"),
+      ocrTranslation: document.querySelector("#ocrTranslation"),
+      ocrStatus: document.querySelector("#ocrStatus"),
       typeTabs: document.querySelector("#typeTabs"),
       messageTime: document.querySelector("#messageTime"),
       messageText: document.querySelector("#messageText"),
@@ -757,6 +859,10 @@
       photo: "照片",
       video: "视频"
     };
+
+    const OPENAI_KEY_STORAGE = "n46mesg-openai-api-key";
+    const OPENAI_MODEL_STORAGE = "n46mesg-openai-model";
+    const DEFAULT_OPENAI_MODEL = "gpt-5-mini";
 
     const defaultAvatarSvg = encodeURIComponent(`
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120">
@@ -806,6 +912,168 @@
         reader.onerror = () => reject(reader.error);
         reader.readAsDataURL(file);
       });
+    }
+
+    function setOcrStatus(text, tone = "") {
+      els.ocrStatus.textContent = text;
+      els.ocrStatus.className = `ai-status ${tone}`.trim();
+    }
+
+    function saveOpenAiKey() {
+      const key = els.openaiKey.value.trim();
+      if (!key) {
+        setOcrStatus("请输入 API Key 后再保存。", "error");
+        return;
+      }
+      localStorage.setItem(OPENAI_KEY_STORAGE, key);
+      localStorage.setItem(OPENAI_MODEL_STORAGE, els.ocrModel.value.trim() || DEFAULT_OPENAI_MODEL);
+      setOcrStatus("已保存到当前浏览器。", "ok");
+    }
+
+    function forgetOpenAiKey() {
+      localStorage.removeItem(OPENAI_KEY_STORAGE);
+      localStorage.removeItem(OPENAI_MODEL_STORAGE);
+      els.openaiKey.value = "";
+      setOcrStatus("已从当前浏览器删除 API Key。", "ok");
+    }
+
+    function loadLocalOpenAiSettings() {
+      const savedKey = localStorage.getItem(OPENAI_KEY_STORAGE);
+      let savedModel = localStorage.getItem(OPENAI_MODEL_STORAGE);
+      if (savedModel === "gpt-4.1-mini") {
+        savedModel = DEFAULT_OPENAI_MODEL;
+        localStorage.setItem(OPENAI_MODEL_STORAGE, savedModel);
+      }
+      if (savedKey) {
+        els.openaiKey.value = savedKey;
+        setOcrStatus("已从当前浏览器读取 API Key。", "ok");
+      }
+      els.ocrModel.value = savedModel || DEFAULT_OPENAI_MODEL;
+    }
+
+    async function imageFileToJpegDataUrl(file) {
+      const source = await fileToDataUrl(file);
+      const img = await loadImage(source);
+      const maxEdge = 1600;
+      const ratio = Math.min(1, maxEdge / Math.max(img.naturalWidth, img.naturalHeight));
+      const width = Math.max(1, Math.round(img.naturalWidth * ratio));
+      const height = Math.max(1, Math.round(img.naturalHeight * ratio));
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext("2d");
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(0, 0, width, height);
+      ctx.drawImage(img, 0, 0, width, height);
+      return canvas.toDataURL("image/jpeg", 0.9);
+    }
+
+    function extractResponseText(data) {
+      if (typeof data.output_text === "string") return data.output_text;
+      const chunks = [];
+      (data.output || []).forEach((item) => {
+        (item.content || []).forEach((part) => {
+          if (typeof part.text === "string") chunks.push(part.text);
+        });
+      });
+      return chunks.join("\n").trim();
+    }
+
+    function parseOcrJson(text) {
+      const cleaned = text
+        .trim()
+        .replace(/^```(?:json)?\s*/i, "")
+        .replace(/\s*```$/i, "");
+      try {
+        return JSON.parse(cleaned);
+      } catch {
+        const start = cleaned.indexOf("{");
+        const end = cleaned.lastIndexOf("}");
+        if (start >= 0 && end > start) {
+          return JSON.parse(cleaned.slice(start, end + 1));
+        }
+        throw new Error("模型返回的内容不是 JSON，请重试或手动复制结果。");
+      }
+    }
+
+    async function runOcrTranslation() {
+      const key = els.openaiKey.value.trim();
+      const model = els.ocrModel.value.trim() || DEFAULT_OPENAI_MODEL;
+      if (!key) {
+        setOcrStatus("请输入 OpenAI API Key。", "error");
+        els.openaiKey.focus();
+        return;
+      }
+      if (!state.ocrImageDataUrl) {
+        setOcrStatus("请先选择一张截图或图片。", "error");
+        els.ocrImage.focus();
+        return;
+      }
+
+      localStorage.setItem(OPENAI_KEY_STORAGE, key);
+      localStorage.setItem(OPENAI_MODEL_STORAGE, model);
+      els.runOcrBtn.disabled = true;
+      setOcrStatus("正在识别并翻译...");
+
+      const prompt = [
+        "你是日文消息截图 OCR 和翻译助手。",
+        "请识别图片中成员发给粉丝的正文内容，并翻译成自然简体中文。",
+        "只处理消息正文，忽略头像、昵称、时间、菜单、省略号、按钮、水印和应用界面文字。",
+        "如果有多条消息，请按从上到下的顺序保留，并用两个换行分隔。",
+        "返回严格 JSON，不要使用 Markdown，不要添加解释。",
+        "JSON 格式必须是：{\"original\":\"原文\",\"translation_zh\":\"中文翻译\"}",
+        `补充要求：${els.ocrPrompt.value.trim() || "无"}`
+      ].join("\n");
+
+      try {
+        const response = await fetch("https://api.openai.com/v1/responses", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${key}`
+          },
+          body: JSON.stringify({
+            model,
+            store: false,
+            input: [
+              {
+                role: "user",
+                content: [
+                  { type: "input_text", text: prompt },
+                  { type: "input_image", image_url: state.ocrImageDataUrl, detail: "high" }
+                ]
+              }
+            ],
+            max_output_tokens: 1600
+          })
+        });
+
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          throw new Error(data.error?.message || `请求失败：${response.status}`);
+        }
+
+        const parsed = parseOcrJson(extractResponseText(data));
+        els.ocrOriginal.value = String(parsed.original || "").trim();
+        els.ocrTranslation.value = String(parsed.translation_zh || "").trim();
+        setOcrStatus("识别翻译完成。", "ok");
+      } catch (error) {
+        setOcrStatus(error.message || "识别翻译失败。", "error");
+      } finally {
+        els.runOcrBtn.disabled = false;
+      }
+    }
+
+    function fillMessageText(value) {
+      const text = String(value || "").trim();
+      if (!text) {
+        setOcrStatus("没有可填入的文字。", "error");
+        return;
+      }
+      els.messageText.value = text;
+      setType("text");
+      els.messageText.focus();
+      setOcrStatus("已填入消息内容。", "ok");
     }
 
     function videoToPoster(file) {
@@ -1386,6 +1654,33 @@
       els.avatarPreview.src = state.avatarDataUrl;
       renderAll();
     });
+    els.saveKeyBtn.addEventListener("click", saveOpenAiKey);
+    els.forgetKeyBtn.addEventListener("click", forgetOpenAiKey);
+    els.ocrModel.addEventListener("change", () => {
+      localStorage.setItem(OPENAI_MODEL_STORAGE, els.ocrModel.value.trim() || DEFAULT_OPENAI_MODEL);
+    });
+    els.ocrImage.addEventListener("change", async () => {
+      const file = els.ocrImage.files?.[0];
+      if (!file) return;
+      try {
+        setOcrStatus("正在读取图片...");
+        state.ocrImageDataUrl = await imageFileToJpegDataUrl(file);
+        state.ocrImageName = file.name;
+        setOcrStatus(`已读取图片：${file.name}`, "ok");
+      } catch (error) {
+        state.ocrImageDataUrl = "";
+        state.ocrImageName = "";
+        setOcrStatus(error.message || "无法读取这张图片。", "error");
+      }
+    });
+    els.runOcrBtn.addEventListener("click", runOcrTranslation);
+    els.useOriginalBtn.addEventListener("click", () => fillMessageText(els.ocrOriginal.value));
+    els.useTranslationBtn.addEventListener("click", () => fillMessageText(els.ocrTranslation.value));
+    els.useBothBtn.addEventListener("click", () => {
+      const original = els.ocrOriginal.value.trim();
+      const translation = els.ocrTranslation.value.trim();
+      fillMessageText([original, translation].filter(Boolean).join("\n\n"));
+    });
     els.typeTabs.addEventListener("click", (event) => {
       const btn = event.target.closest("button[data-type]");
       if (btn) setType(btn.dataset.type);
@@ -1408,6 +1703,7 @@
     els.downloadBtnTop.addEventListener("click", downloadImage);
     els.addSampleBtn.addEventListener("click", addSample);
 
+    loadLocalOpenAiSettings();
     setType("text");
     resetEditor();
     renderAll();
