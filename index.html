@@ -20,9 +20,10 @@
         "Noto Sans JP", "Noto Sans CJK SC", "Noto Sans SC", "Source Han Sans JP",
         "Source Han Sans SC", "Hiragino Sans", "Yu Gothic UI", "Yu Gothic",
         Meiryo, "Microsoft YaHei UI", "Microsoft YaHei", Arial, sans-serif;
-      --message-font-stack: "Hiragino Kaku Gothic ProN", "Hiragino Sans",
-        "Yu Gothic UI", "Yu Gothic", YuGothic, Meiryo, "Noto Sans JP",
-        "Noto Sans CJK JP", "Microsoft YaHei UI", "Microsoft YaHei", sans-serif;
+      --message-font-stack: "Noto Sans CJK SC", "Noto Sans SC", "Source Han Sans SC",
+        "Microsoft YaHei UI", "Microsoft YaHei", "Noto Sans CJK JP", "Noto Sans JP",
+        "Source Han Sans JP", "Hiragino Sans", "Yu Gothic UI", "Yu Gothic",
+        Meiryo, "Segoe UI", Arial, sans-serif;
       color-scheme: light;
       font-family: var(--font-stack);
     }
@@ -440,10 +441,12 @@
       font-family: var(--message-font-stack);
       font-size: 13px;
       font-weight: 400;
-      letter-spacing: 0;
-      line-height: 2.08;
+      letter-spacing: 0.025em;
+      line-height: 29px;
       white-space: pre-wrap;
-      word-break: break-word;
+      word-break: normal;
+      overflow-wrap: anywhere;
+      line-break: strict;
     }
 
     .bubble::before {
@@ -545,10 +548,12 @@
       font-family: var(--message-font-stack);
       font-size: 13px;
       font-weight: 400;
-      letter-spacing: 0;
-      line-height: 2.08;
+      letter-spacing: 0.025em;
+      line-height: 29px;
       white-space: pre-wrap;
-      word-break: break-word;
+      word-break: normal;
+      overflow-wrap: anywhere;
+      line-break: strict;
     }
 
     .ai-status {
@@ -936,18 +941,25 @@
       "sans-serif"
     ].join(", ");
     const EXPORT_MESSAGE_FONT_STACK = [
-      "\"Hiragino Kaku Gothic ProN\"",
+      "\"Noto Sans CJK SC\"",
+      "\"Noto Sans SC\"",
+      "\"Source Han Sans SC\"",
+      "\"Microsoft YaHei UI\"",
+      "\"Microsoft YaHei\"",
+      "\"Noto Sans CJK JP\"",
+      "\"Noto Sans JP\"",
+      "\"Source Han Sans JP\"",
       "\"Hiragino Sans\"",
       "\"Yu Gothic UI\"",
       "\"Yu Gothic\"",
-      "YuGothic",
       "Meiryo",
-      "\"Noto Sans JP\"",
-      "\"Noto Sans CJK JP\"",
-      "\"Microsoft YaHei UI\"",
-      "\"Microsoft YaHei\"",
+      "\"Segoe UI\"",
+      "Arial",
       "sans-serif"
     ].join(", ");
+    const MESSAGE_FONT_SIZE = 13;
+    const MESSAGE_LINE_HEIGHT = 29;
+    const MESSAGE_LETTER_SPACING = 0.33;
 
     const defaultAvatarSvg = encodeURIComponent(`
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120">
@@ -1628,7 +1640,12 @@
       ctx.restore();
     }
 
-    function wrapText(ctx, text, maxWidth) {
+    function measureTextWidth(ctx, text, letterSpacing = 0) {
+      const chars = Array.from(text);
+      return ctx.measureText(text).width + Math.max(0, chars.length - 1) * letterSpacing;
+    }
+
+    function wrapText(ctx, text, maxWidth, letterSpacing = 0) {
       const lines = [];
       const paragraphs = String(text || "").split("\n");
       paragraphs.forEach((paragraph, pIndex) => {
@@ -1639,7 +1656,7 @@
         let line = "";
         Array.from(paragraph).forEach((char) => {
           const test = line + char;
-          if (ctx.measureText(test).width > maxWidth && line) {
+          if (measureTextWidth(ctx, test, letterSpacing) > maxWidth && line) {
             lines.push(line);
             line = char;
           } else {
@@ -1673,17 +1690,17 @@
 
     function measureMessage(ctx, msg) {
       const bubbleWidth = 407;
-      const lineHeight = 26;
-      ctx.font = messageFont(13);
+      const lineHeight = MESSAGE_LINE_HEIGHT;
+      ctx.font = messageFont(MESSAGE_FONT_SIZE);
       if (msg.type === "text") {
-        const lines = wrapText(ctx, msg.text, bubbleWidth - 48);
-        return 27 + 12 + Math.max(58, 33 + lines.length * lineHeight);
+        const lines = wrapText(ctx, msg.text, bubbleWidth - 48, MESSAGE_LETTER_SPACING);
+        return 27 + 12 + Math.max(58, 34 + lines.length * lineHeight);
       }
 
       const mediaHeight = msg.type === "video" ? 360 : 360;
       let captionHeight = 0;
       if ((msg.text || "").trim()) {
-        const lines = wrapText(ctx, msg.text, bubbleWidth - 50);
+        const lines = wrapText(ctx, msg.text, bubbleWidth - 50, MESSAGE_LETTER_SPACING);
         captionHeight = 20 + lines.length * lineHeight;
       }
       return 27 + 12 + 47 + mediaHeight + captionHeight;
@@ -1697,13 +1714,21 @@
       return `${weight} ${size}px ${EXPORT_MESSAGE_FONT_STACK}`;
     }
 
-    function drawMultiline(ctx, text, x, y, maxWidth, lineHeight, size = 13, color = "#33363a") {
+    function drawTextWithSpacing(ctx, text, x, y, letterSpacing = 0) {
+      let cursor = x;
+      Array.from(text).forEach((char) => {
+        ctx.fillText(char, cursor, y);
+        cursor += ctx.measureText(char).width + letterSpacing;
+      });
+    }
+
+    function drawMultiline(ctx, text, x, y, maxWidth, lineHeight, size = MESSAGE_FONT_SIZE, color = "#33363a") {
       ctx.font = messageFont(size);
       ctx.fillStyle = color;
       ctx.textBaseline = "top";
-      const lines = wrapText(ctx, text, maxWidth);
+      const lines = wrapText(ctx, text, maxWidth, MESSAGE_LETTER_SPACING);
       lines.forEach((line, index) => {
-        if (line) ctx.fillText(line, x, y + index * lineHeight);
+        if (line) drawTextWithSpacing(ctx, line, x, y + index * lineHeight, MESSAGE_LETTER_SPACING);
       });
       return lines.length * lineHeight;
     }
@@ -1765,19 +1790,19 @@
         ctx.fillText("...", 482, y - 1);
 
         if (msg.type === "text") {
-          ctx.font = messageFont(13);
-          const lines = wrapText(ctx, msg.text, bubbleWidth - 48);
-          const bubbleHeight = Math.max(58, 33 + lines.length * 26);
+          ctx.font = messageFont(MESSAGE_FONT_SIZE);
+          const lines = wrapText(ctx, msg.text, bubbleWidth - 48, MESSAGE_LETTER_SPACING);
+          const bubbleHeight = Math.max(58, 34 + lines.length * MESSAGE_LINE_HEIGHT);
           drawBubbleBase(ctx, bubbleX, bubbleY, bubbleWidth, bubbleHeight);
-          drawMultiline(ctx, msg.text, bubbleX + 24, bubbleY + 16, bubbleWidth - 48, 26);
+          drawMultiline(ctx, msg.text, bubbleX + 24, bubbleY + 17, bubbleWidth - 48, MESSAGE_LINE_HEIGHT);
         } else {
           const mediaHeight = msg.type === "video" ? 360 : 360;
           const mediaWidth = msg.type === "video" ? 202 : 268;
-          ctx.font = messageFont(13);
+          ctx.font = messageFont(MESSAGE_FONT_SIZE);
           const captionLines = (msg.text || "").trim()
-            ? wrapText(ctx, msg.text, bubbleWidth - 50)
+            ? wrapText(ctx, msg.text, bubbleWidth - 50, MESSAGE_LETTER_SPACING)
             : [];
-          const captionHeight = captionLines.length ? 20 + captionLines.length * 26 : 0;
+          const captionHeight = captionLines.length ? 20 + captionLines.length * MESSAGE_LINE_HEIGHT : 0;
           const bubbleHeight = 47 + mediaHeight + captionHeight;
           drawBubbleBase(ctx, bubbleX, bubbleY, bubbleWidth, bubbleHeight);
 
@@ -1815,11 +1840,17 @@
           }
 
           if (captionLines.length) {
-            ctx.font = messageFont(13);
+            ctx.font = messageFont(MESSAGE_FONT_SIZE);
             ctx.fillStyle = "#33363a";
             ctx.textBaseline = "top";
             captionLines.forEach((line, lineIndex) => {
-              ctx.fillText(line, bubbleX + 25, mediaY + mediaHeight + 20 + lineIndex * 26);
+              drawTextWithSpacing(
+                ctx,
+                line,
+                bubbleX + 25,
+                mediaY + mediaHeight + 20 + lineIndex * MESSAGE_LINE_HEIGHT,
+                MESSAGE_LETTER_SPACING
+              );
             });
           }
         }
