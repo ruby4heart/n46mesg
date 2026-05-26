@@ -16,9 +16,12 @@
       --accent-dark: #1f4eaa;
       --danger: #c63f46;
       --shadow: 0 18px 50px rgba(26, 38, 52, 0.13);
+      --font-stack: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans CJK JP",
+        "Noto Sans JP", "Noto Sans CJK SC", "Noto Sans SC", "Source Han Sans JP",
+        "Source Han Sans SC", "Hiragino Sans", "Yu Gothic UI", "Yu Gothic",
+        Meiryo, "Microsoft YaHei UI", "Microsoft YaHei", Arial, sans-serif;
       color-scheme: light;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Sans",
-        "Yu Gothic", Meiryo, "Microsoft YaHei", sans-serif;
+      font-family: var(--font-stack);
     }
 
     * {
@@ -864,6 +867,25 @@
     const OPENAI_MODEL_STORAGE = "n46mesg-openai-model";
     const DEFAULT_OPENAI_MODEL = "gpt-5.4-mini";
     const LEGACY_DEFAULT_OPENAI_MODELS = new Set(["gpt-4.1-mini", "gpt-5-mini"]);
+    const EXPORT_FONT_STACK = [
+      "-apple-system",
+      "BlinkMacSystemFont",
+      "\"Segoe UI\"",
+      "\"Noto Sans CJK JP\"",
+      "\"Noto Sans JP\"",
+      "\"Noto Sans CJK SC\"",
+      "\"Noto Sans SC\"",
+      "\"Source Han Sans JP\"",
+      "\"Source Han Sans SC\"",
+      "\"Hiragino Sans\"",
+      "\"Yu Gothic UI\"",
+      "\"Yu Gothic\"",
+      "Meiryo",
+      "\"Microsoft YaHei UI\"",
+      "\"Microsoft YaHei\"",
+      "Arial",
+      "sans-serif"
+    ].join(", ");
 
     const defaultAvatarSvg = encodeURIComponent(`
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120">
@@ -1496,7 +1518,7 @@
     }
 
     function font(size, weight = 400) {
-      return `${weight} ${size}px -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Sans", "Yu Gothic", Meiryo, "Microsoft YaHei", sans-serif`;
+      return `${weight} ${size}px ${EXPORT_FONT_STACK}`;
     }
 
     function drawMultiline(ctx, text, x, y, maxWidth, lineHeight, size = 13, color = "#3f4245") {
