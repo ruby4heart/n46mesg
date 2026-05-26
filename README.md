@@ -12,7 +12,7 @@
 - 一键导出 PNG
 - 图片 OCR + 日文转中文
 - 从截图中提取消息时间并填入消息栏
-- OpenAI API Key 仅保存在当前浏览器本机
+- OpenAI / DeepSeek API Key 仅保存在当前浏览器本机
 
 ## 本地使用
 
@@ -30,9 +30,14 @@ python -m http.server 5173
 http://127.0.0.1:5173
 ```
 
-## OpenAI OCR / 翻译
+## OCR / 翻译
 
-页面内的「图片识别翻译」功能会：
+页面内的「图片识别翻译」功能支持两种 API 服务：
+
+- OpenAI：支持截图 OCR、时间提取、原文识别和中文翻译
+- DeepSeek：支持把已识别或手动粘贴的原文翻译成中文
+
+OpenAI 流程会：
 
 1. 读取你上传的截图
 2. 在浏览器中压缩成 JPEG
@@ -40,13 +45,16 @@ http://127.0.0.1:5173
 4. 输出识别时间、原文和中文翻译
 5. 一键填入消息时间或消息内容框
 
-默认模型是：
+DeepSeek 官方 API 当前按文本 Chat Completions 接口接入，本工具不会用 DeepSeek 直接识别图片。使用 DeepSeek 时，请先把日文原文粘贴到「原文」框，再点击翻译。
+
+默认模型：
 
 ```text
-gpt-5.4-mini
+OpenAI: gpt-5.4-mini
+DeepSeek: deepseek-v4-flash
 ```
 
-API Key 会保存在浏览器 `localStorage`，不会写进仓库，也不会上传到 Cloudflare。请求会直接从你的浏览器发送给 OpenAI。
+API Key 会保存在浏览器 `localStorage`，不会写进仓库，也不会上传到 Cloudflare。请求会直接从你的浏览器发送给所选 API 服务。
 
 请不要把 API Key 写进 `index.html`，也不要提交到 GitHub。
 

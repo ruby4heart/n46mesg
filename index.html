@@ -690,17 +690,24 @@
           </div>
 
           <div class="grid">
+            <div class="field">
+              <label for="apiProvider">API 服务</label>
+              <select id="apiProvider">
+                <option value="openai">OpenAI（图片 OCR + 翻译）</option>
+                <option value="deepseek">DeepSeek（文本翻译）</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="ocrModel">模型</label>
+              <input id="ocrModel" value="gpt-5.4-mini">
+            </div>
             <div class="field full">
-              <label for="openaiKey">OpenAI API Key（本机保存）</label>
+              <label id="apiKeyLabel" for="openaiKey">OpenAI API Key（本机保存）</label>
               <div class="key-row">
                 <input id="openaiKey" type="password" autocomplete="off" placeholder="sk-...">
                 <button class="btn secondary" id="saveKeyBtn" type="button">保存</button>
                 <button class="btn danger" id="forgetKeyBtn" type="button">删除</button>
               </div>
-            </div>
-            <div class="field">
-              <label for="ocrModel">模型</label>
-              <input id="ocrModel" value="gpt-5.4-mini">
             </div>
             <div class="field">
               <label for="ocrImage">截图/图片</label>
@@ -829,6 +836,8 @@
       defaultTime: document.querySelector("#defaultTime"),
       avatarInput: document.querySelector("#avatarInput"),
       avatarPreview: document.querySelector("#avatarPreview"),
+      apiProvider: document.querySelector("#apiProvider"),
+      apiKeyLabel: document.querySelector("#apiKeyLabel"),
       openaiKey: document.querySelector("#openaiKey"),
       saveKeyBtn: document.querySelector("#saveKeyBtn"),
       forgetKeyBtn: document.querySelector("#forgetKeyBtn"),
@@ -873,7 +882,31 @@
     const OPENAI_KEY_STORAGE = "n46mesg-openai-api-key";
     const OPENAI_MODEL_STORAGE = "n46mesg-openai-model";
     const DEFAULT_OPENAI_MODEL = "gpt-5.4-mini";
+    const AI_PROVIDER_STORAGE = "n46mesg-api-provider";
+    const DEEPSEEK_KEY_STORAGE = "n46mesg-deepseek-api-key";
+    const DEEPSEEK_MODEL_STORAGE = "n46mesg-deepseek-model";
+    const DEFAULT_DEEPSEEK_MODEL = "deepseek-v4-flash";
     const LEGACY_DEFAULT_OPENAI_MODELS = new Set(["gpt-4.1-mini", "gpt-5-mini"]);
+    const AI_PROVIDERS = {
+      openai: {
+        label: "OpenAI",
+        keyStorage: OPENAI_KEY_STORAGE,
+        modelStorage: OPENAI_MODEL_STORAGE,
+        defaultModel: DEFAULT_OPENAI_MODEL,
+        keyPlaceholder: "sk-...",
+        actionLabel: "识别并翻译",
+        supportsImageOcr: true
+      },
+      deepseek: {
+        label: "DeepSeek",
+        keyStorage: DEEPSEEK_KEY_STORAGE,
+        modelStorage: DEEPSEEK_MODEL_STORAGE,
+        defaultModel: DEFAULT_DEEPSEEK_MODEL,
+        keyPlaceholder: "sk-...",
+        actionLabel: "翻译原文",
+        supportsImageOcr: false
+      }
+    };
     const EXPORT_FONT_STACK = [
       "-apple-system",
       "BlinkMacSystemFont",
@@ -949,36 +982,72 @@
       els.ocrStatus.className = `ai-status ${tone}`.trim();
     }
 
+    function getActiveProviderId() {
+      return AI_PROVIDERS[els.apiProvider.value] ? els.apiProvider.value : "openai";
+    }
+
+    function getActiveProvider() {
+      return AI_PROVIDERS[getActiveProviderId()];
+    }
+
+    function getSavedModel(providerId) {
+      const provider = AI_PROVIDERS[providerId];
+      let savedModel = localStorage.getItem(provider.modelStorage);
+      if (providerId === "openai" && LEGACY_DEFAULT_OPENAI_MODELS.has(savedModel)) {
+        savedModel = provider.defaultModel;
+        localStorage.setItem(provider.modelStorage, savedModel);
+      }
+      return savedModel || provider.defaultModel;
+    }
+
+    function updateProviderFields(showStatus = true) {
+      const providerId = getActiveProviderId();
+      const provider = getActiveProvider();
+      localStorage.setItem(AI_PROVIDER_STORAGE, providerId);
+      els.apiKeyLabel.textContent = `${provider.label} API Key（本机保存）`;
+      els.openaiKey.value = localStorage.getItem(provider.keyStorage) || "";
+      els.openaiKey.placeholder = provider.keyPlaceholder;
+      els.ocrModel.value = getSavedModel(providerId);
+      els.runOcrBtn.textContent = provider.actionLabel;
+      if (!showStatus) return;
+      if (provider.supportsImageOcr) {
+        setOcrStatus(`${provider.label} 会识别图片里的时间和正文，并翻译成中文。`);
+      } else {
+        setOcrStatus(`${provider.label} 官方 API 当前按文本接口接入：请先在“原文”里粘贴文字，再翻译。`);
+      }
+    }
+
     function saveOpenAiKey() {
       const key = els.openaiKey.value.trim();
+      const provider = getActiveProvider();
       if (!key) {
         setOcrStatus("请输入 API Key 后再保存。", "error");
         return;
       }
-      localStorage.setItem(OPENAI_KEY_STORAGE, key);
-      localStorage.setItem(OPENAI_MODEL_STORAGE, els.ocrModel.value.trim() || DEFAULT_OPENAI_MODEL);
-      setOcrStatus("已保存到当前浏览器。", "ok");
+      localStorage.setItem(provider.keyStorage, key);
+      localStorage.setItem(provider.modelStorage, els.ocrModel.value.trim() || provider.defaultModel);
+      setOcrStatus(`已保存 ${provider.label} 设置到当前浏览器。`, "ok");
     }
 
     function forgetOpenAiKey() {
-      localStorage.removeItem(OPENAI_KEY_STORAGE);
-      localStorage.removeItem(OPENAI_MODEL_STORAGE);
+      const provider = getActiveProvider();
+      localStorage.removeItem(provider.keyStorage);
+      localStorage.removeItem(provider.modelStorage);
       els.openaiKey.value = "";
-      setOcrStatus("已从当前浏览器删除 API Key。", "ok");
+      els.ocrModel.value = provider.defaultModel;
+      setOcrStatus(`已从当前浏览器删除 ${provider.label} 设置。`, "ok");
     }
 
     function loadLocalOpenAiSettings() {
-      const savedKey = localStorage.getItem(OPENAI_KEY_STORAGE);
-      let savedModel = localStorage.getItem(OPENAI_MODEL_STORAGE);
-      if (LEGACY_DEFAULT_OPENAI_MODELS.has(savedModel)) {
-        savedModel = DEFAULT_OPENAI_MODEL;
-        localStorage.setItem(OPENAI_MODEL_STORAGE, savedModel);
+      const savedProvider = localStorage.getItem(AI_PROVIDER_STORAGE);
+      els.apiProvider.value = AI_PROVIDERS[savedProvider] ? savedProvider : "openai";
+      updateProviderFields(false);
+      const provider = getActiveProvider();
+      if (els.openaiKey.value) {
+        setOcrStatus(`已从当前浏览器读取 ${provider.label} API Key。`, "ok");
+      } else {
+        setOcrStatus("API Key 只保存在当前浏览器。");
       }
-      if (savedKey) {
-        els.openaiKey.value = savedKey;
-        setOcrStatus("已从当前浏览器读取 API Key。", "ok");
-      }
-      els.ocrModel.value = savedModel || DEFAULT_OPENAI_MODEL;
     }
 
     async function imageFileToJpegDataUrl(file) {
@@ -1007,6 +1076,10 @@
         });
       });
       return chunks.join("\n").trim();
+    }
+
+    function extractChatCompletionText(data) {
+      return String(data.choices?.[0]?.message?.content || "").trim();
     }
 
     function parseOcrJson(text) {
@@ -1040,23 +1113,26 @@
     }
 
     async function runOcrTranslation() {
+      const providerId = getActiveProviderId();
+      const provider = getActiveProvider();
       const key = els.openaiKey.value.trim();
-      const model = els.ocrModel.value.trim() || DEFAULT_OPENAI_MODEL;
+      const model = els.ocrModel.value.trim() || provider.defaultModel;
+      const originalText = els.ocrOriginal.value.trim();
       if (!key) {
-        setOcrStatus("请输入 OpenAI API Key。", "error");
+        setOcrStatus(`请输入 ${provider.label} API Key。`, "error");
         els.openaiKey.focus();
         return;
       }
-      if (!state.ocrImageDataUrl) {
+      if (provider.supportsImageOcr && !state.ocrImageDataUrl) {
         setOcrStatus("请先选择一张截图或图片。", "error");
         els.ocrImage.focus();
         return;
       }
 
-      localStorage.setItem(OPENAI_KEY_STORAGE, key);
-      localStorage.setItem(OPENAI_MODEL_STORAGE, model);
+      localStorage.setItem(provider.keyStorage, key);
+      localStorage.setItem(provider.modelStorage, model);
       els.runOcrBtn.disabled = true;
-      setOcrStatus("正在识别并翻译...");
+      setOcrStatus(provider.supportsImageOcr ? "正在识别并翻译..." : "正在用 DeepSeek 翻译原文...");
 
       const prompt = [
         "你是日文消息截图 OCR 和翻译助手。",
@@ -1070,34 +1146,72 @@
       ].join("\n");
 
       try {
-        const response = await fetch("https://api.openai.com/v1/responses", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${key}`
-          },
-          body: JSON.stringify({
-            model,
-            store: false,
-            input: [
-              {
-                role: "user",
-                content: [
-                  { type: "input_text", text: prompt },
-                  { type: "input_image", image_url: state.ocrImageDataUrl, detail: "high" }
-                ]
-              }
-            ],
-            max_output_tokens: 1600
-          })
-        });
+        let parsed;
+        if (providerId === "deepseek") {
+          if (!originalText) {
+            throw new Error("DeepSeek 官方 API 当前按文本接口接入，不支持直接识别图片。请先在“原文”里粘贴日文，再点击翻译。");
+          }
+          const deepseekPrompt = [
+            "请把下面的日文消息翻译成自然简体中文。",
+            "如果文本中含有类似 5/26 20:17 的时间，请提取到 time；否则 time 为空字符串。",
+            "返回严格 JSON，不要使用 Markdown，不要添加解释。",
+            "JSON 格式必须是：{\"time\":\"5/26 20:17\",\"original\":\"原文\",\"translation_zh\":\"中文翻译\"}",
+            `补充要求：${els.ocrPrompt.value.trim() || "无"}`,
+            "原文：",
+            originalText
+          ].join("\n");
+          const response = await fetch("https://api.deepseek.com/chat/completions", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": `Bearer ${key}`
+            },
+            body: JSON.stringify({
+              model,
+              messages: [
+                { role: "system", content: "你是日文到简体中文的消息翻译助手，只输出 JSON。" },
+                { role: "user", content: deepseekPrompt }
+              ],
+              response_format: { type: "json_object" },
+              max_tokens: 1600,
+              stream: false
+            })
+          });
+          const data = await response.json().catch(() => ({}));
+          if (!response.ok) {
+            throw new Error(data.error?.message || `请求失败：${response.status}`);
+          }
+          parsed = parseOcrJson(extractChatCompletionText(data));
+        } else {
+          const response = await fetch("https://api.openai.com/v1/responses", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": `Bearer ${key}`
+            },
+            body: JSON.stringify({
+              model,
+              store: false,
+              input: [
+                {
+                  role: "user",
+                  content: [
+                    { type: "input_text", text: prompt },
+                    { type: "input_image", image_url: state.ocrImageDataUrl, detail: "high" }
+                  ]
+                }
+              ],
+              max_output_tokens: 1600
+            })
+          });
 
-        const data = await response.json().catch(() => ({}));
-        if (!response.ok) {
-          throw new Error(data.error?.message || `请求失败：${response.status}`);
+          const data = await response.json().catch(() => ({}));
+          if (!response.ok) {
+            throw new Error(data.error?.message || `请求失败：${response.status}`);
+          }
+          parsed = parseOcrJson(extractResponseText(data));
         }
 
-        const parsed = parseOcrJson(extractResponseText(data));
         els.ocrTime.value = extractTimeValue(parsed);
         els.ocrOriginal.value = String(parsed.original || "").trim();
         els.ocrTranslation.value = String(parsed.translation_zh || "").trim();
@@ -1715,8 +1829,10 @@
     });
     els.saveKeyBtn.addEventListener("click", saveOpenAiKey);
     els.forgetKeyBtn.addEventListener("click", forgetOpenAiKey);
+    els.apiProvider.addEventListener("change", () => updateProviderFields(true));
     els.ocrModel.addEventListener("change", () => {
-      localStorage.setItem(OPENAI_MODEL_STORAGE, els.ocrModel.value.trim() || DEFAULT_OPENAI_MODEL);
+      const provider = getActiveProvider();
+      localStorage.setItem(provider.modelStorage, els.ocrModel.value.trim() || provider.defaultModel);
     });
     els.ocrImage.addEventListener("change", async () => {
       const file = els.ocrImage.files?.[0];
