@@ -697,7 +697,7 @@
             </div>
             <div class="field">
               <label for="ocrModel">模型</label>
-              <input id="ocrModel" value="gpt-5-mini">
+              <input id="ocrModel" value="gpt-5.4-mini">
             </div>
             <div class="field">
               <label for="ocrImage">截图/图片</label>
@@ -862,7 +862,8 @@
 
     const OPENAI_KEY_STORAGE = "n46mesg-openai-api-key";
     const OPENAI_MODEL_STORAGE = "n46mesg-openai-model";
-    const DEFAULT_OPENAI_MODEL = "gpt-5-mini";
+    const DEFAULT_OPENAI_MODEL = "gpt-5.4-mini";
+    const LEGACY_DEFAULT_OPENAI_MODELS = new Set(["gpt-4.1-mini", "gpt-5-mini"]);
 
     const defaultAvatarSvg = encodeURIComponent(`
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120">
@@ -940,7 +941,7 @@
     function loadLocalOpenAiSettings() {
       const savedKey = localStorage.getItem(OPENAI_KEY_STORAGE);
       let savedModel = localStorage.getItem(OPENAI_MODEL_STORAGE);
-      if (savedModel === "gpt-4.1-mini") {
+      if (LEGACY_DEFAULT_OPENAI_MODELS.has(savedModel)) {
         savedModel = DEFAULT_OPENAI_MODEL;
         localStorage.setItem(OPENAI_MODEL_STORAGE, savedModel);
       }

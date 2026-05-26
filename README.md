@@ -42,7 +42,7 @@ http://127.0.0.1:5173
 默认模型是：
 
 ```text
-gpt-5-mini
+gpt-5.4-mini
 ```
 
 API Key 会保存在浏览器 `localStorage`，不会写进仓库，也不会上传到 Cloudflare。请求会直接从你的浏览器发送给 OpenAI。
