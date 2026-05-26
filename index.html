@@ -1,0 +1,1416 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>消息图片排版工具</title>
+  <style>
+    :root {
+      --app-bg: #eef1f4;
+      --panel: #ffffff;
+      --panel-line: #dfe4ea;
+      --text: #1f2933;
+      --muted: #66727f;
+      --soft: #f7f7f7;
+      --accent: #2864d8;
+      --accent-dark: #1f4eaa;
+      --danger: #c63f46;
+      --shadow: 0 18px 50px rgba(26, 38, 52, 0.13);
+      color-scheme: light;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Sans",
+        "Yu Gothic", Meiryo, "Microsoft YaHei", sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: var(--app-bg);
+      color: var(--text);
+    }
+
+    button,
+    input,
+    select,
+    textarea {
+      font: inherit;
+    }
+
+    button {
+      border: 0;
+      cursor: pointer;
+    }
+
+    .app {
+      display: grid;
+      grid-template-columns: minmax(320px, 430px) minmax(560px, 1fr);
+      gap: 20px;
+      min-height: 100vh;
+      padding: 20px;
+    }
+
+    .workspace,
+    .preview-shell {
+      min-width: 0;
+    }
+
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--panel-line);
+      border-radius: 8px;
+      box-shadow: var(--shadow);
+    }
+
+    .workspace {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .toolbar {
+      position: sticky;
+      top: 20px;
+      z-index: 3;
+      padding: 16px;
+    }
+
+    .toolbar h1 {
+      margin: 0 0 12px;
+      font-size: 18px;
+      font-weight: 700;
+      letter-spacing: 0;
+    }
+
+    .section {
+      padding: 16px;
+    }
+
+    .section + .section {
+      border-top: 1px solid var(--panel-line);
+    }
+
+    .section-title {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 12px;
+      gap: 12px;
+    }
+
+    .section-title h2 {
+      margin: 0;
+      font-size: 14px;
+      font-weight: 700;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    .field {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      min-width: 0;
+    }
+
+    .field.full {
+      grid-column: 1 / -1;
+    }
+
+    label,
+    .field-name {
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    input,
+    select,
+    textarea {
+      width: 100%;
+      border: 1px solid #ccd5df;
+      border-radius: 6px;
+      background: #fff;
+      color: var(--text);
+      outline: none;
+      transition: border-color 0.15s ease, box-shadow 0.15s ease;
+    }
+
+    input,
+    select {
+      height: 38px;
+      padding: 0 10px;
+    }
+
+    textarea {
+      min-height: 118px;
+      resize: vertical;
+      padding: 10px;
+      line-height: 1.7;
+    }
+
+    input:focus,
+    select:focus,
+    textarea:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(40, 100, 216, 0.14);
+    }
+
+    input[type="file"] {
+      height: auto;
+      min-height: 38px;
+      padding: 7px;
+      line-height: 1.2;
+    }
+
+    .row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-width: 0;
+    }
+
+    .avatar-demo {
+      width: 50px;
+      height: 50px;
+      flex: 0 0 auto;
+      border-radius: 50%;
+      background:
+        radial-gradient(circle at 30% 30%, #f9c7c0, transparent 34%),
+        radial-gradient(circle at 70% 70%, #f3e1d7, transparent 35%),
+        linear-gradient(135deg, #d8aa78, #fff1ec);
+      border: 1px solid rgba(0, 0, 0, 0.05);
+      object-fit: cover;
+    }
+
+    .segmented {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 6px;
+      padding: 4px;
+      border: 1px solid #ccd5df;
+      border-radius: 7px;
+      background: #f5f7fa;
+    }
+
+    .segmented button {
+      height: 34px;
+      border-radius: 5px;
+      background: transparent;
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .segmented button.active {
+      background: #ffffff;
+      color: var(--accent);
+      box-shadow: 0 1px 5px rgba(25, 36, 48, 0.12);
+    }
+
+    .checkline {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .checkline input {
+      width: 16px;
+      height: 16px;
+      accent-color: var(--accent);
+    }
+
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 7px;
+      min-height: 38px;
+      border-radius: 6px;
+      padding: 0 12px;
+      color: #fff;
+      background: var(--accent);
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    .btn:hover {
+      background: var(--accent-dark);
+    }
+
+    .btn.secondary {
+      background: #e8edf3;
+      color: #26313d;
+    }
+
+    .btn.secondary:hover {
+      background: #dbe3ec;
+    }
+
+    .btn.danger {
+      background: #fae7e8;
+      color: var(--danger);
+    }
+
+    .btn.danger:hover {
+      background: #f3d2d5;
+    }
+
+    .btn.icon {
+      width: 34px;
+      min-height: 34px;
+      padding: 0;
+      border-radius: 6px;
+    }
+
+    .message-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .message-item {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 10px;
+      padding: 11px;
+      border: 1px solid var(--panel-line);
+      border-radius: 8px;
+      background: #fbfcfd;
+    }
+
+    .message-item strong {
+      display: block;
+      margin-bottom: 4px;
+      font-size: 13px;
+    }
+
+    .message-item p {
+      display: -webkit-box;
+      margin: 0;
+      overflow: hidden;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.5;
+      -webkit-box-orient: vertical;
+      -webkit-line-clamp: 2;
+    }
+
+    .item-actions {
+      display: flex;
+      align-items: flex-start;
+      gap: 6px;
+    }
+
+    .empty {
+      border: 1px dashed #b9c4d0;
+      border-radius: 8px;
+      padding: 18px;
+      color: var(--muted);
+      text-align: center;
+      font-size: 13px;
+    }
+
+    .preview-shell {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      align-items: center;
+      overflow: auto;
+      padding-bottom: 24px;
+    }
+
+    .preview-top {
+      position: sticky;
+      top: 20px;
+      z-index: 2;
+      display: flex;
+      justify-content: center;
+      width: min(100%, 720px);
+      padding: 14px;
+    }
+
+    .preview-actions {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 8px;
+    }
+
+    .phone-frame {
+      width: 560px;
+      min-height: 360px;
+      background: #ffffff;
+      box-shadow: 0 16px 42px rgba(31, 42, 55, 0.16);
+    }
+
+    #preview {
+      width: 560px;
+      padding: 22px 23px 26px;
+      background: #ffffff;
+    }
+
+    .msg {
+      display: grid;
+      grid-template-columns: 62px 1fr;
+      column-gap: 15px;
+      margin-bottom: 42px;
+    }
+
+    .msg:last-child {
+      margin-bottom: 0;
+    }
+
+    .msg-avatar {
+      width: 55px;
+      height: 55px;
+      border-radius: 50%;
+      object-fit: cover;
+      background:
+        radial-gradient(circle at 33% 30%, #f5c0bd, transparent 32%),
+        radial-gradient(circle at 70% 66%, #fff6f3, transparent 40%),
+        linear-gradient(135deg, #c3915f, #f4dacb 52%, #fff5f0);
+    }
+
+    .msg-head {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      align-items: start;
+      min-height: 27px;
+      padding-top: 1px;
+    }
+
+    .msg-meta {
+      display: flex;
+      align-items: center;
+      gap: 23px;
+      min-width: 0;
+      color: #333333;
+      font-size: 16px;
+      line-height: 1.3;
+    }
+
+    .msg-name {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      max-width: 210px;
+    }
+
+    .msg-time {
+      flex: 0 0 auto;
+      color: #4b4f53;
+    }
+
+    .dots {
+      color: #9a9a9a;
+      font-size: 20px;
+      font-weight: 700;
+      line-height: 18px;
+      letter-spacing: 1px;
+    }
+
+    .bubble {
+      position: relative;
+      margin-top: 12px;
+      min-height: 58px;
+      border-radius: 4px;
+      background: var(--soft);
+      color: #3f4245;
+      font-size: 13px;
+      line-height: 2.05;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    .bubble::before {
+      position: absolute;
+      top: 0;
+      left: -10px;
+      width: 0;
+      height: 0;
+      border-top: 10px solid var(--soft);
+      border-left: 10px solid transparent;
+      content: "";
+    }
+
+    .bubble.text {
+      padding: 16px 24px 17px;
+    }
+
+    .bubble.media {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 20px;
+      padding: 23px 17px 24px;
+    }
+
+    .media-img {
+      display: block;
+      max-width: 268px;
+      max-height: 360px;
+      border-radius: 4px;
+      object-fit: cover;
+      background: #e3e7eb;
+    }
+
+    .media-img.photo {
+      width: 268px;
+      aspect-ratio: 3 / 4;
+    }
+
+    .video-wrap {
+      position: relative;
+      width: 202px;
+      height: 360px;
+      overflow: hidden;
+      border-radius: 4px;
+      background: #d8dde2;
+    }
+
+    .video-wrap .media-img {
+      width: 100%;
+      height: 100%;
+      max-width: none;
+      max-height: none;
+    }
+
+    .play-mark {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      display: grid;
+      place-items: center;
+      width: 62px;
+      height: 62px;
+      border-radius: 50%;
+      background: rgba(0, 0, 0, 0.28);
+      transform: translate(-50%, -50%);
+    }
+
+    .play-mark::before {
+      width: 0;
+      height: 0;
+      margin-left: 5px;
+      border-top: 15px solid transparent;
+      border-bottom: 15px solid transparent;
+      border-left: 22px solid #ffffff;
+      content: "";
+    }
+
+    .no-audio {
+      position: absolute;
+      bottom: 14px;
+      left: 0;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      height: 34px;
+      border-radius: 0 9px 9px 0;
+      padding: 0 9px;
+      background: rgba(132, 132, 132, 0.72);
+      color: #ffffff;
+      font-size: 14px;
+      font-weight: 700;
+    }
+
+    .media-caption {
+      align-self: stretch;
+      margin: 0 8px;
+      color: #3f4245;
+      font-size: 13px;
+      line-height: 2;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    .export-result {
+      display: none;
+      width: min(100%, 720px);
+      padding: 14px;
+    }
+
+    .export-result.visible {
+      display: block;
+    }
+
+    .export-result img {
+      display: block;
+      width: 100%;
+      max-width: 560px;
+      margin: 0 auto;
+      border: 1px solid var(--panel-line);
+      background: #fff;
+    }
+
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+    }
+
+    @media (max-width: 980px) {
+      .app {
+        grid-template-columns: 1fr;
+      }
+
+      .toolbar,
+      .preview-top {
+        position: static;
+      }
+    }
+
+    @media (max-width: 620px) {
+      .app {
+        padding: 12px;
+      }
+
+      .grid {
+        grid-template-columns: 1fr;
+      }
+
+      .phone-frame,
+      #preview {
+        width: 100%;
+      }
+
+      #preview {
+        min-width: 360px;
+        transform-origin: top center;
+      }
+
+      .preview-shell {
+        align-items: stretch;
+      }
+
+      .phone-frame {
+        overflow-x: auto;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="app">
+    <section class="workspace">
+      <div class="panel toolbar">
+        <h1>消息图片排版工具</h1>
+        <div class="actions">
+          <button class="btn" id="downloadBtn" type="button">下载 PNG</button>
+          <button class="btn secondary" id="renderBtn" type="button">生成预览图</button>
+          <button class="btn secondary" id="clearBtn" type="button">清空消息</button>
+        </div>
+      </div>
+
+      <div class="panel">
+        <section class="section">
+          <div class="section-title">
+            <h2>成员信息</h2>
+          </div>
+          <div class="grid">
+            <div class="field full">
+              <span class="field-name">头像</span>
+              <div class="row">
+                <img class="avatar-demo" id="avatarPreview" alt="">
+                <input id="avatarInput" type="file" accept="image/*">
+              </div>
+            </div>
+            <div class="field">
+              <label for="memberName">名字</label>
+              <input id="memberName" value="中西 アルノ" maxlength="28">
+            </div>
+            <div class="field">
+              <label for="defaultTime">默认时间</label>
+              <input id="defaultTime" value="5/26 18:03" placeholder="5/26 18:03">
+            </div>
+          </div>
+        </section>
+
+        <section class="section">
+          <div class="section-title">
+            <h2 id="editorTitle">新增消息</h2>
+          </div>
+
+          <div class="field">
+            <span class="field-name">类型</span>
+            <div class="segmented" id="typeTabs" role="tablist" aria-label="消息类型">
+              <button class="active" data-type="text" type="button">文字</button>
+              <button data-type="photo" type="button">照片</button>
+              <button data-type="video" type="button">视频</button>
+            </div>
+          </div>
+
+          <div class="grid" style="margin-top: 10px;">
+            <div class="field">
+              <label for="messageTime">时间</label>
+              <input id="messageTime" placeholder="5/26 20:17">
+            </div>
+            <div class="field media-only">
+              <label for="mediaInput">图片/视频封面</label>
+              <input id="mediaInput" type="file" accept="image/*,video/*">
+            </div>
+            <div class="field full">
+              <label for="messageText">内容</label>
+              <textarea id="messageText" placeholder="把成员发来的文字粘贴到这里"></textarea>
+            </div>
+            <label class="checkline full video-only">
+              <input id="noAudio" type="checkbox" checked>
+              <span>显示「此视频无音频」</span>
+            </label>
+          </div>
+
+          <div class="actions" style="margin-top: 12px;">
+            <button class="btn" id="saveMessageBtn" type="button">加入预览</button>
+            <button class="btn secondary" id="cancelEditBtn" type="button">取消编辑</button>
+          </div>
+        </section>
+
+        <section class="section">
+          <div class="section-title">
+            <h2>消息列表</h2>
+          </div>
+          <div class="message-list" id="messageList"></div>
+        </section>
+      </div>
+    </section>
+
+    <section class="preview-shell">
+      <div class="panel preview-top">
+        <div class="preview-actions">
+          <button class="btn" id="downloadBtnTop" type="button">下载 PNG</button>
+          <button class="btn secondary" id="addSampleBtn" type="button">加入示例</button>
+        </div>
+      </div>
+      <div class="phone-frame" aria-label="消息图片预览">
+        <div id="preview"></div>
+      </div>
+      <div class="panel export-result" id="exportResult">
+        <img id="exportImage" alt="导出的消息图片">
+      </div>
+    </section>
+  </main>
+
+  <canvas class="sr-only" id="exportCanvas"></canvas>
+
+  <script>
+    const state = {
+      memberName: "中西 アルノ",
+      defaultTime: "5/26 18:03",
+      avatarDataUrl: "",
+      selectedType: "text",
+      editingId: null,
+      mediaDraft: null,
+      messages: [
+        {
+          id: crypto.randomUUID(),
+          type: "text",
+          time: "5/26 18:03",
+          text: "メッセージを入力すると、この形式で表示されます。"
+        }
+      ]
+    };
+
+    const els = {
+      memberName: document.querySelector("#memberName"),
+      defaultTime: document.querySelector("#defaultTime"),
+      avatarInput: document.querySelector("#avatarInput"),
+      avatarPreview: document.querySelector("#avatarPreview"),
+      typeTabs: document.querySelector("#typeTabs"),
+      messageTime: document.querySelector("#messageTime"),
+      messageText: document.querySelector("#messageText"),
+      mediaInput: document.querySelector("#mediaInput"),
+      noAudio: document.querySelector("#noAudio"),
+      saveMessageBtn: document.querySelector("#saveMessageBtn"),
+      cancelEditBtn: document.querySelector("#cancelEditBtn"),
+      clearBtn: document.querySelector("#clearBtn"),
+      renderBtn: document.querySelector("#renderBtn"),
+      downloadBtn: document.querySelector("#downloadBtn"),
+      downloadBtnTop: document.querySelector("#downloadBtnTop"),
+      addSampleBtn: document.querySelector("#addSampleBtn"),
+      preview: document.querySelector("#preview"),
+      messageList: document.querySelector("#messageList"),
+      editorTitle: document.querySelector("#editorTitle"),
+      canvas: document.querySelector("#exportCanvas"),
+      exportResult: document.querySelector("#exportResult"),
+      exportImage: document.querySelector("#exportImage")
+    };
+
+    const typeLabel = {
+      text: "文字",
+      photo: "照片",
+      video: "视频"
+    };
+
+    const defaultAvatarSvg = encodeURIComponent(`
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120">
+        <defs>
+          <linearGradient id="g" x1="0" x2="1" y1="0" y2="1">
+            <stop stop-color="#be8a51"/>
+            <stop offset=".52" stop-color="#f4d5c5"/>
+            <stop offset="1" stop-color="#fff7f2"/>
+          </linearGradient>
+        </defs>
+        <rect width="120" height="120" rx="60" fill="url(#g)"/>
+        <circle cx="43" cy="42" r="25" fill="#f5b8b4" opacity=".8"/>
+        <circle cx="82" cy="78" r="32" fill="#fff7f2" opacity=".9"/>
+        <path d="M35 88c18-20 48-19 64 2" stroke="#a87554" stroke-width="8" fill="none" stroke-linecap="round" opacity=".38"/>
+      </svg>
+    `);
+    const defaultAvatarUrl = `data:image/svg+xml;charset=utf-8,${defaultAvatarSvg}`;
+    els.avatarPreview.src = defaultAvatarUrl;
+
+    function syncMember() {
+      state.memberName = els.memberName.value.trim() || " ";
+      state.defaultTime = els.defaultTime.value.trim();
+      if (!els.messageTime.value.trim() && !state.editingId) {
+        els.messageTime.value = state.defaultTime;
+      }
+      renderAll();
+    }
+
+    function setType(type) {
+      state.selectedType = type;
+      els.typeTabs.querySelectorAll("button").forEach((btn) => {
+        btn.classList.toggle("active", btn.dataset.type === type);
+      });
+      document.querySelectorAll(".media-only").forEach((item) => {
+        item.style.display = type === "text" ? "none" : "";
+      });
+      document.querySelectorAll(".video-only").forEach((item) => {
+        item.style.display = type === "video" ? "flex" : "none";
+      });
+      renderAll();
+    }
+
+    function fileToDataUrl(file) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = () => reject(reader.error);
+        reader.readAsDataURL(file);
+      });
+    }
+
+    function videoToPoster(file) {
+      return new Promise((resolve, reject) => {
+        const video = document.createElement("video");
+        const url = URL.createObjectURL(file);
+        video.preload = "metadata";
+        video.muted = true;
+        video.playsInline = true;
+        video.onloadedmetadata = () => {
+          video.currentTime = Math.min(0.35, Math.max(0, video.duration || 0));
+        };
+        video.onseeked = () => {
+          const canvas = document.createElement("canvas");
+          canvas.width = video.videoWidth || 720;
+          canvas.height = video.videoHeight || 1280;
+          const ctx = canvas.getContext("2d");
+          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+          URL.revokeObjectURL(url);
+          resolve(canvas.toDataURL("image/jpeg", 0.92));
+        };
+        video.onerror = () => {
+          URL.revokeObjectURL(url);
+          reject(new Error("无法读取这个视频，请改用截图或封面图。"));
+        };
+        video.src = url;
+      });
+    }
+
+    async function mediaFileToData(file) {
+      if (!file) return null;
+      if (file.type.startsWith("video/")) {
+        return {
+          dataUrl: await videoToPoster(file),
+          name: file.name
+        };
+      }
+      return {
+        dataUrl: await fileToDataUrl(file),
+        name: file.name
+      };
+    }
+
+    function resetEditor() {
+      state.editingId = null;
+      state.mediaDraft = null;
+      els.editorTitle.textContent = "新增消息";
+      els.saveMessageBtn.textContent = "加入预览";
+      els.messageTime.value = state.defaultTime;
+      els.messageText.value = "";
+      els.mediaInput.value = "";
+      els.noAudio.checked = true;
+      setType("text");
+    }
+
+    function currentDraft() {
+      return {
+        type: state.selectedType,
+        time: els.messageTime.value.trim() || state.defaultTime || " ",
+        text: els.messageText.value,
+        mediaUrl: state.mediaDraft?.dataUrl || "",
+        mediaName: state.mediaDraft?.name || "",
+        noAudio: els.noAudio.checked
+      };
+    }
+
+    function saveMessage() {
+      const draft = currentDraft();
+      const hasText = draft.text.trim().length > 0;
+      const hasMedia = draft.type === "text" || draft.mediaUrl;
+      if (!hasText && draft.type === "text") {
+        els.messageText.focus();
+        return;
+      }
+      if (!hasMedia) {
+        els.mediaInput.focus();
+        return;
+      }
+
+      if (state.editingId) {
+        state.messages = state.messages.map((msg) => (
+          msg.id === state.editingId ? { ...msg, ...draft } : msg
+        ));
+      } else {
+        state.messages.push({
+          id: crypto.randomUUID(),
+          ...draft
+        });
+      }
+      resetEditor();
+      renderAll();
+    }
+
+    function editMessage(id) {
+      const msg = state.messages.find((item) => item.id === id);
+      if (!msg) return;
+      state.editingId = id;
+      state.mediaDraft = msg.mediaUrl
+        ? { dataUrl: msg.mediaUrl, name: msg.mediaName || "当前媒体" }
+        : null;
+      els.editorTitle.textContent = "编辑消息";
+      els.saveMessageBtn.textContent = "保存修改";
+      els.messageTime.value = msg.time;
+      els.messageText.value = msg.text || "";
+      els.noAudio.checked = msg.noAudio !== false;
+      els.mediaInput.value = "";
+      setType(msg.type);
+    }
+
+    function deleteMessage(id) {
+      state.messages = state.messages.filter((msg) => msg.id !== id);
+      if (state.editingId === id) resetEditor();
+      renderAll();
+    }
+
+    function moveMessage(id, direction) {
+      const index = state.messages.findIndex((msg) => msg.id === id);
+      const next = index + direction;
+      if (index < 0 || next < 0 || next >= state.messages.length) return;
+      const copy = [...state.messages];
+      const [item] = copy.splice(index, 1);
+      copy.splice(next, 0, item);
+      state.messages = copy;
+      renderAll();
+    }
+
+    function addSample() {
+      state.messages = [
+        ...state.messages,
+        {
+          id: crypto.randomUUID(),
+          type: "text",
+          time: "5/26 20:17",
+          text: "改行もそのまま反映できます。\n\n長めの文章を入れると、吹き出しの中で自然に折り返します。"
+        },
+        {
+          id: crypto.randomUUID(),
+          type: "photo",
+          time: "5/25 19:52",
+          text: "写真つきのメッセージは、画像の下に本文が入ります。",
+          mediaUrl: "",
+          noAudio: true
+        },
+        {
+          id: crypto.randomUUID(),
+          type: "video",
+          time: "5/16 20:46",
+          text: "",
+          mediaUrl: "",
+          noAudio: true
+        }
+      ];
+      renderAll();
+    }
+
+    function placeholderMedia(type) {
+      const label = type === "video" ? "VIDEO" : "PHOTO";
+      return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(`
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 480">
+          <defs>
+            <linearGradient id="g" x1="0" x2="1" y1="0" y2="1">
+              <stop stop-color="#d9dee4"/>
+              <stop offset="1" stop-color="#b8c2cc"/>
+            </linearGradient>
+          </defs>
+          <rect width="320" height="480" fill="url(#g)"/>
+          <circle cx="160" cy="210" r="58" fill="#f5f7f9" opacity=".78"/>
+          <text x="160" y="315" text-anchor="middle" font-family="Arial, sans-serif" font-size="32" font-weight="700" fill="#7a8793">${label}</text>
+        </svg>
+      `)}`;
+    }
+
+    function messageNode(msg) {
+      const article = document.createElement("article");
+      article.className = "msg";
+
+      const avatar = document.createElement("img");
+      avatar.className = "msg-avatar";
+      avatar.alt = "";
+      avatar.src = state.avatarDataUrl || defaultAvatarUrl;
+
+      const body = document.createElement("div");
+      const head = document.createElement("div");
+      head.className = "msg-head";
+
+      const meta = document.createElement("div");
+      meta.className = "msg-meta";
+      const name = document.createElement("span");
+      name.className = "msg-name";
+      name.textContent = state.memberName;
+      const time = document.createElement("span");
+      time.className = "msg-time";
+      time.textContent = msg.time;
+      meta.append(name, time);
+
+      const dots = document.createElement("div");
+      dots.className = "dots";
+      dots.textContent = "...";
+      head.append(meta, dots);
+
+      const bubble = document.createElement("div");
+      bubble.className = `bubble ${msg.type === "text" ? "text" : "media"}`;
+
+      if (msg.type === "text") {
+        bubble.textContent = msg.text;
+      } else if (msg.type === "photo") {
+        const img = document.createElement("img");
+        img.className = "media-img photo";
+        img.alt = "";
+        img.src = msg.mediaUrl || placeholderMedia("photo");
+        bubble.append(img);
+        if (msg.text.trim()) {
+          const caption = document.createElement("p");
+          caption.className = "media-caption";
+          caption.textContent = msg.text;
+          bubble.append(caption);
+        }
+      } else {
+        const wrap = document.createElement("div");
+        wrap.className = "video-wrap";
+        const img = document.createElement("img");
+        img.className = "media-img";
+        img.alt = "";
+        img.src = msg.mediaUrl || placeholderMedia("video");
+        const play = document.createElement("span");
+        play.className = "play-mark";
+        wrap.append(img, play);
+        if (msg.noAudio !== false) {
+          const noAudio = document.createElement("span");
+          noAudio.className = "no-audio";
+          noAudio.textContent = "↘ 此视频无音频";
+          wrap.append(noAudio);
+        }
+        bubble.append(wrap);
+        if (msg.text.trim()) {
+          const caption = document.createElement("p");
+          caption.className = "media-caption";
+          caption.textContent = msg.text;
+          bubble.append(caption);
+        }
+      }
+
+      body.append(head, bubble);
+      article.append(avatar, body);
+      return article;
+    }
+
+    function renderPreview() {
+      els.preview.replaceChildren();
+      if (!state.messages.length) {
+        const msg = {
+          id: "empty",
+          type: "text",
+          time: state.defaultTime || "5/26 18:03",
+          text: "这里会显示你加入的消息。"
+        };
+        els.preview.append(messageNode(msg));
+        return;
+      }
+      state.messages.forEach((msg) => els.preview.append(messageNode(msg)));
+    }
+
+    function renderMessageList() {
+      els.messageList.replaceChildren();
+      if (!state.messages.length) {
+        const empty = document.createElement("div");
+        empty.className = "empty";
+        empty.textContent = "还没有消息，先在上方添加一条。";
+        els.messageList.append(empty);
+        return;
+      }
+
+      state.messages.forEach((msg, index) => {
+        const item = document.createElement("div");
+        item.className = "message-item";
+
+        const info = document.createElement("div");
+        const title = document.createElement("strong");
+        title.textContent = `${index + 1}. ${typeLabel[msg.type]} · ${msg.time}`;
+        const text = document.createElement("p");
+        text.textContent = msg.text.trim() || (msg.mediaName ? msg.mediaName : "无文字内容");
+        info.append(title, text);
+
+        const actions = document.createElement("div");
+        actions.className = "item-actions";
+        actions.append(
+          tinyButton("↑", "上移", () => moveMessage(msg.id, -1)),
+          tinyButton("↓", "下移", () => moveMessage(msg.id, 1)),
+          tinyButton("✎", "编辑", () => editMessage(msg.id)),
+          tinyButton("×", "删除", () => deleteMessage(msg.id), "danger")
+        );
+
+        item.append(info, actions);
+        els.messageList.append(item);
+      });
+    }
+
+    function tinyButton(text, title, action, tone = "secondary") {
+      const btn = document.createElement("button");
+      btn.className = `btn icon ${tone}`;
+      btn.type = "button";
+      btn.title = title;
+      btn.setAttribute("aria-label", title);
+      btn.textContent = text;
+      btn.addEventListener("click", action);
+      return btn;
+    }
+
+    function renderAll() {
+      renderPreview();
+      renderMessageList();
+    }
+
+    function loadImage(src) {
+      return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => resolve(img);
+        img.onerror = reject;
+        img.src = src;
+      });
+    }
+
+    function roundRect(ctx, x, y, width, height, radius) {
+      const r = Math.min(radius, width / 2, height / 2);
+      ctx.beginPath();
+      ctx.moveTo(x + r, y);
+      ctx.arcTo(x + width, y, x + width, y + height, r);
+      ctx.arcTo(x + width, y + height, x, y + height, r);
+      ctx.arcTo(x, y + height, x, y, r);
+      ctx.arcTo(x, y, x + width, y, r);
+      ctx.closePath();
+    }
+
+    function drawRoundedImage(ctx, img, x, y, width, height, radius, cover = true) {
+      ctx.save();
+      roundRect(ctx, x, y, width, height, radius);
+      ctx.clip();
+      if (cover) {
+        const scale = Math.max(width / img.naturalWidth, height / img.naturalHeight);
+        const sw = width / scale;
+        const sh = height / scale;
+        const sx = (img.naturalWidth - sw) / 2;
+        const sy = (img.naturalHeight - sh) / 2;
+        ctx.drawImage(img, sx, sy, sw, sh, x, y, width, height);
+      } else {
+        ctx.drawImage(img, x, y, width, height);
+      }
+      ctx.restore();
+    }
+
+    function drawAvatar(ctx, img, x, y, size) {
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(x + size / 2, y + size / 2, size / 2, 0, Math.PI * 2);
+      ctx.clip();
+      ctx.drawImage(img, x, y, size, size);
+      ctx.restore();
+    }
+
+    function wrapText(ctx, text, maxWidth) {
+      const lines = [];
+      const paragraphs = String(text || "").split("\n");
+      paragraphs.forEach((paragraph, pIndex) => {
+        if (paragraph === "") {
+          lines.push("");
+          return;
+        }
+        let line = "";
+        Array.from(paragraph).forEach((char) => {
+          const test = line + char;
+          if (ctx.measureText(test).width > maxWidth && line) {
+            lines.push(line);
+            line = char;
+          } else {
+            line = test;
+          }
+        });
+        lines.push(line);
+        if (pIndex < paragraphs.length - 1 && paragraph !== "") {
+          // The next paragraph contributes its own blank line when needed.
+        }
+      });
+      return lines.length ? lines : [""];
+    }
+
+    function roundedFill(ctx, x, y, width, height, radius, color) {
+      ctx.fillStyle = color;
+      roundRect(ctx, x, y, width, height, radius);
+      ctx.fill();
+    }
+
+    function drawBubbleBase(ctx, x, y, width, height) {
+      roundedFill(ctx, x, y, width, height, 4, "#f7f7f7");
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+      ctx.lineTo(x - 10, y);
+      ctx.lineTo(x, y + 10);
+      ctx.closePath();
+      ctx.fillStyle = "#f7f7f7";
+      ctx.fill();
+    }
+
+    function measureMessage(ctx, msg) {
+      const bubbleWidth = 407;
+      const lineHeight = 26;
+      ctx.font = font(13);
+      if (msg.type === "text") {
+        const lines = wrapText(ctx, msg.text, bubbleWidth - 48);
+        return 27 + 12 + Math.max(58, 33 + lines.length * lineHeight);
+      }
+
+      const mediaHeight = msg.type === "video" ? 360 : 360;
+      let captionHeight = 0;
+      if ((msg.text || "").trim()) {
+        const lines = wrapText(ctx, msg.text, bubbleWidth - 50);
+        captionHeight = 20 + lines.length * lineHeight;
+      }
+      return 27 + 12 + 47 + mediaHeight + captionHeight;
+    }
+
+    function font(size, weight = 400) {
+      return `${weight} ${size}px -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Sans", "Yu Gothic", Meiryo, "Microsoft YaHei", sans-serif`;
+    }
+
+    function drawMultiline(ctx, text, x, y, maxWidth, lineHeight, size = 13, color = "#3f4245") {
+      ctx.font = font(size);
+      ctx.fillStyle = color;
+      ctx.textBaseline = "top";
+      const lines = wrapText(ctx, text, maxWidth);
+      lines.forEach((line, index) => {
+        if (line) ctx.fillText(line, x, y + index * lineHeight);
+      });
+      return lines.length * lineHeight;
+    }
+
+    async function renderCanvas() {
+      const scale = 2;
+      const width = 560;
+      const paddingTop = 22;
+      const paddingBottom = 26;
+      const gap = 42;
+      const messages = state.messages.length ? state.messages : [{
+        type: "text",
+        time: state.defaultTime || "5/26 18:03",
+        text: "这里会显示你加入的消息。"
+      }];
+
+      const ctxMeasure = els.canvas.getContext("2d");
+      const heights = messages.map((msg) => measureMessage(ctxMeasure, msg));
+      const height = Math.ceil(
+        paddingTop + paddingBottom + heights.reduce((sum, value) => sum + value, 0) + gap * (messages.length - 1)
+      );
+
+      els.canvas.width = width * scale;
+      els.canvas.height = height * scale;
+      els.canvas.style.width = `${width}px`;
+      els.canvas.style.height = `${height}px`;
+
+      const ctx = els.canvas.getContext("2d");
+      ctx.setTransform(scale, 0, 0, scale, 0, 0);
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(0, 0, width, height);
+
+      const avatar = await loadImage(state.avatarDataUrl || defaultAvatarUrl);
+      const mediaImages = await Promise.all(messages.map((msg) => {
+        if (msg.type === "text") return Promise.resolve(null);
+        return loadImage(msg.mediaUrl || placeholderMedia(msg.type));
+      }));
+
+      let y = paddingTop;
+      messages.forEach((msg, index) => {
+        const xAvatar = 23;
+        const xBody = 100;
+        const bubbleX = 100;
+        const bubbleY = y + 39;
+        const bubbleWidth = 407;
+        const messageHeight = heights[index];
+
+        drawAvatar(ctx, avatar, xAvatar, y, 55);
+
+        ctx.textBaseline = "top";
+        ctx.font = font(16);
+        ctx.fillStyle = "#333333";
+        ctx.fillText(state.memberName, xBody, y + 1);
+        const nameWidth = Math.min(ctx.measureText(state.memberName).width, 210);
+        ctx.fillStyle = "#4b4f53";
+        ctx.fillText(msg.time, xBody + nameWidth + 23, y + 1);
+        ctx.font = font(20, 700);
+        ctx.fillStyle = "#9a9a9a";
+        ctx.fillText("...", 482, y - 1);
+
+        if (msg.type === "text") {
+          const lines = wrapText(ctx, msg.text, bubbleWidth - 48);
+          const bubbleHeight = Math.max(58, 33 + lines.length * 26);
+          drawBubbleBase(ctx, bubbleX, bubbleY, bubbleWidth, bubbleHeight);
+          drawMultiline(ctx, msg.text, bubbleX + 24, bubbleY + 16, bubbleWidth - 48, 26);
+        } else {
+          const mediaHeight = msg.type === "video" ? 360 : 360;
+          const mediaWidth = msg.type === "video" ? 202 : 268;
+          const captionLines = (msg.text || "").trim()
+            ? wrapText(ctx, msg.text, bubbleWidth - 50)
+            : [];
+          const captionHeight = captionLines.length ? 20 + captionLines.length * 26 : 0;
+          const bubbleHeight = 47 + mediaHeight + captionHeight;
+          drawBubbleBase(ctx, bubbleX, bubbleY, bubbleWidth, bubbleHeight);
+
+          const img = mediaImages[index];
+          const mediaX = bubbleX + (bubbleWidth - mediaWidth) / 2;
+          const mediaY = bubbleY + 23;
+          drawRoundedImage(ctx, img, mediaX, mediaY, mediaWidth, mediaHeight, 4, true);
+
+          if (msg.type === "video") {
+            ctx.save();
+            ctx.globalAlpha = 0.3;
+            ctx.fillStyle = "#000000";
+            ctx.beginPath();
+            ctx.arc(mediaX + mediaWidth / 2, mediaY + mediaHeight / 2, 31, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+
+            ctx.beginPath();
+            ctx.moveTo(mediaX + mediaWidth / 2 - 7, mediaY + mediaHeight / 2 - 15);
+            ctx.lineTo(mediaX + mediaWidth / 2 - 7, mediaY + mediaHeight / 2 + 15);
+            ctx.lineTo(mediaX + mediaWidth / 2 + 17, mediaY + mediaHeight / 2);
+            ctx.closePath();
+            ctx.fillStyle = "#ffffff";
+            ctx.fill();
+
+            if (msg.noAudio !== false) {
+              const tagX = mediaX;
+              const tagY = mediaY + mediaHeight - 48;
+              roundedFill(ctx, tagX, tagY, 126, 34, 9, "rgba(132, 132, 132, 0.72)");
+              ctx.font = font(14, 700);
+              ctx.fillStyle = "#ffffff";
+              ctx.textBaseline = "middle";
+              ctx.fillText("↘ 此视频无音频", tagX + 8, tagY + 17);
+            }
+          }
+
+          if (captionLines.length) {
+            ctx.font = font(13);
+            ctx.fillStyle = "#3f4245";
+            ctx.textBaseline = "top";
+            captionLines.forEach((line, lineIndex) => {
+              ctx.fillText(line, bubbleX + 25, mediaY + mediaHeight + 20 + lineIndex * 26);
+            });
+          }
+        }
+
+        y += messageHeight + gap;
+      });
+
+      return els.canvas.toDataURL("image/png");
+    }
+
+    async function showExport() {
+      const dataUrl = await renderCanvas();
+      els.exportImage.src = dataUrl;
+      els.exportResult.classList.add("visible");
+      return dataUrl;
+    }
+
+    async function downloadImage() {
+      const dataUrl = await showExport();
+      const link = document.createElement("a");
+      const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-");
+      link.href = dataUrl;
+      link.download = `message-${stamp}.png`;
+      link.click();
+    }
+
+    els.memberName.addEventListener("input", syncMember);
+    els.defaultTime.addEventListener("input", syncMember);
+    els.avatarInput.addEventListener("change", async () => {
+      const file = els.avatarInput.files?.[0];
+      if (!file) return;
+      state.avatarDataUrl = await fileToDataUrl(file);
+      els.avatarPreview.src = state.avatarDataUrl;
+      renderAll();
+    });
+    els.typeTabs.addEventListener("click", (event) => {
+      const btn = event.target.closest("button[data-type]");
+      if (btn) setType(btn.dataset.type);
+    });
+    els.mediaInput.addEventListener("change", async () => {
+      const file = els.mediaInput.files?.[0];
+      if (!file) return;
+      state.mediaDraft = await mediaFileToData(file);
+      renderAll();
+    });
+    els.saveMessageBtn.addEventListener("click", saveMessage);
+    els.cancelEditBtn.addEventListener("click", resetEditor);
+    els.clearBtn.addEventListener("click", () => {
+      state.messages = [];
+      resetEditor();
+      renderAll();
+    });
+    els.renderBtn.addEventListener("click", showExport);
+    els.downloadBtn.addEventListener("click", downloadImage);
+    els.downloadBtnTop.addEventListener("click", downloadImage);
+    els.addSampleBtn.addEventListener("click", addSample);
+
+    setType("text");
+    resetEditor();
+    renderAll();
+  </script>
+</body>
+</html>
